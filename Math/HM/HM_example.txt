@@ -1,0 +1,46 @@
+//matriz homogénea y angulos de Euler example
+#include "HM.h"
+#include <stdio.h>
+#include <cmath>
+#include <array>
+using namespace std;
+
+extern "C" void app_main(void){
+
+    HM transform;
+
+    float dh_parameters[3][4] = { 
+        {90,10,90,0},
+        {30,0,0,15},
+        {45,0,0,20}
+    };
+    array<array<float, 4>, 4> H = {{ // Matriz identidad
+        {1, 0, 0, 0},
+        {0, 1, 0, 0},
+        {0, 0, 1, 0},
+        {0, 0, 0, 1}
+    }};
+    int joints = sizeof(dh_parameters) / sizeof(dh_parameters[0]);
+
+    for(int i=0;i<joints;i++){
+        array<array<float, 4>, 4> H_new = transform.getHM(dh_parameters[i]);
+        H = transform.mult_matrix(H,H_new);
+    }
+
+    array<float, 3> Euler = transform.getEulerAngles(H);
+
+    // Imprimir matriz homogénea final
+    printf("Matriz de transformación homogénea final:\n");
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            printf("%f ", H[i][j]);
+        }
+        printf("\n");
+    }
+
+    // Imprimir ángulos de Euler
+    printf("Ángulos de Euler:\n");
+    printf("Roll: %f\n", Euler[0]);
+    printf("Pitch: %f\n", Euler[1]);
+    printf("Yaw: %f\n", Euler[2]);
+}

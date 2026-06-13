@@ -1,0 +1,65 @@
+//matriz homogénea y angulos de euler
+#include <stdio.h>
+#include <cmath>
+#include <array>
+using namespace std;
+array<array<float, 4>, 4> getHM(float dh_parameters[4]) //orden de los parametros t,d,a,r 
+{
+    float t, d, a, r;
+    t = dh_parameters[0]; //angulo theta
+    d = dh_parameters[1];
+    a = dh_parameters[2]; //angulo alpha
+    r = dh_parameters[3]; 
+    //conversion de grados a radianes
+    if(t != 0) t=t*M_PI/180;
+    if(a != 0) a=a*M_PI/180;
+    array<array<float, 4>,4> H={{
+        {cos(t), -cos(a)*sin(t),  sin(a)*sin(t), r*cos(t)},
+        {sin(t),  cos(a)*cos(t), -sin(a)*cos(t), r*sin(t)},
+        {0,       sin(a),         cos(a),        d},
+        {0,       0,              0,             1}
+    }};
+    return H;
+}
+array<array<float, 4>, 4> mult_matrix(const array<array<float, 4>, 4>& A, const array<array<float, 4>, 4>& B) {
+    array<array<float, 4>, 4> result = {0};
+
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            for (int k = 0; k < 4; ++k) {
+                result[i][j] += A[i][k] * B[k][j];
+            }
+        }
+    }
+    return result;
+}
+extern "C" void app_main(void)
+{
+    float dh_parameters[3][4] = { 
+        {90,10,90,0},
+        {30,0,0,15},
+        {45,0,0,20}};
+    int joints = sizeof(dh_parameters) / sizeof(dh_parameters[0]);    
+    array<array<float, 4>, 4> H = {{ // Matriz identidad
+        {1, 0, 0, 0},
+        {0, 1, 0, 0},
+        {0, 0, 1, 0},
+        {0, 0, 0, 1}
+    }};
+    for(int i=0;i<joints;i++){
+        array<array<float, 4>, 4> H_new = getHM(dh_parameters[i]);
+        H = mult_matrix(H,H_new);
+    }
+    //Euler angles
+    float roll_z = atan2(H[2][1], H[2][2])* 180.0 / M_PI;
+    float pitch_y = atan2(-H[2][0], sqrt(H[2][1]*H[2][1] + H[2][2]*H[2][2]))* 180.0 / M_PI;
+    float yaw_x = atan2(H[1][0], H[0][0])* 180.0 / M_PI;
+    printf("Matriz de transformación Homogenea final:\n");
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            printf("%f ", H[i][j]);
+        }
+        printf("\n");
+    }
+    printf("Angulos de Euler: roll: %f pitch: %f yaw: %f \n", roll_z,pitch_y,yaw_x);
+}
