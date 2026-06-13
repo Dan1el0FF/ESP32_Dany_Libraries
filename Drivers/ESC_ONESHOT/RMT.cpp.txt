@@ -1,0 +1,63 @@
+#include "ESCOShot.h"
+
+
+ESCOShot::ESCOShot() {}
+
+
+void ESCOShot::begin(rmt_channel_t _channel, gpio_num_t _pin) {
+channel = _channel;
+pin = _pin;
+
+
+rmt_config_t config = {};
+config.rmt_mode = RMT_MODE_TX;
+config.channel = channel;
+config.gpio_num = pin;
+config.mem_block_num = 1;
+config.tx_config.loop_en = true; // señal continua
+config.tx_config.carrier_en = false;
+config.tx_config.idle_output_en = true;
+config.tx_config.idle_level = RMT_IDLE_LEVEL_LOW;
+
+
+// Clock de 1 MHz → 1 tick = 1 µs
+config.clk_div = 80;
+
+
+rmt_config(&config);
+rmt_driver_install(channel, 0, 0);
+
+
+// Arranca en 0 (armado seguro)
+write(0);
+}
+
+
+void ESCOShot::buildFrame(uint8_t power) {
+if (power > 100) power = 100;
+
+
+// Mapea 0–100 → 125–250 µs
+uint16_t pulse_us = min_us + (power * (max_us - min_us)) / 100;
+uint16_t low_us = period_us - pulse_us;
+
+
+// Pulso HIGH
+item[0].level0 = 1;
+item[0].duration0 = pulse_us;
+item[0].level1 = 0;
+item[0].duration1 = low_us;
+
+
+// Terminador
+item[1].level0 = 0;
+item[1].duration0 = 0;
+item[1].level1 = 0;
+item[1].duration1 = 0;
+}
+
+
+void ESCOShot::write(uint8_t power) {
+buildFrame(power);
+rmt_write_items(channel, item, 1, true);
+}

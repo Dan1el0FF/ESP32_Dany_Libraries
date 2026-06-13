@@ -1,0 +1,15 @@
+ESCOShot_LEDC esc;
+
+
+void setup() {
+esc.begin(0, GPIO_NUM_18);
+}
+
+
+void loop() {
+esc.write(50);
+}
+
+
+===============================================================
+*/
