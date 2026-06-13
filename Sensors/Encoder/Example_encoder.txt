@@ -1,0 +1,21 @@
+//MAIN.CPP CODIGO DE EJEMPLO
+#include "Encoder.h"
+#include "iostream"
+#include <driver/gpio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+using namespace std;
+
+extern "C" void app_main(void){
+
+    Encoder motorA(16,4,300,50); //PIN A, PIN B, PULSOS POR REVOLUCION, TIEMPO DE MUESTREO.
+while(true){
+    float rpm=motorA.getRpm(); //muestra de velocidad A
+    int checkpulses=motorA.getPulsesA(); //obten los pulsos de A
+    cout<<"Los pulsos son: "<<checkpulses<<" y las RPM son: "<<rpm<<"\n"; 
+    //motorA.resetPulsesB();
+    //vTaskDelay(2000/portTICK_PERIOD_MS);
+    //cout<<"Los pulsos B son: "<<motorA.getPulsesB()<<" \n";
+
+}
+}

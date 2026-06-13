@@ -1,0 +1,86 @@
+#include "Encoder.h"
+
+Encoder::Encoder(int isr_pin_A_,int isr_pin_B_,int ppr_, int interval_MS_){
+    isr_pin_A=isr_pin_A_;
+    isr_pin_B=isr_pin_B_;
+    ppr=ppr_;
+    interval_MS=interval_MS_;
+
+    configureEncoder();
+}
+
+void Encoder::configureEncoder(){
+
+    gpio_config_t pGPIOConfig_A; //config del pin de interrupción A
+
+    pGPIOConfig_A.pin_bit_mask = 1ULL << gpio_num_t(isr_pin_A); //PIN QUAD A
+    pGPIOConfig_A.mode = GPIO_MODE_INPUT;
+    pGPIOConfig_A.pull_up_en = GPIO_PULLUP_ENABLE;
+    pGPIOConfig_A.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    pGPIOConfig_A.intr_type = GPIO_INTR_POSEDGE;
+
+    gpio_config(&pGPIOConfig_A); //se guarda la configuracion A
+
+    gpio_config_t pGPIOConfig_B; //config del pin de interrupción B
+
+    pGPIOConfig_B.pin_bit_mask = 1ULL << gpio_num_t(isr_pin_B); //PIN QUAD B
+    pGPIOConfig_B.mode = GPIO_MODE_INPUT;
+    pGPIOConfig_B.pull_up_en = GPIO_PULLUP_ENABLE;
+    pGPIOConfig_B.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    pGPIOConfig_B.intr_type = GPIO_INTR_POSEDGE;
+
+    gpio_config(&pGPIOConfig_B); //se guarda la configuracion B
+
+    gpio_install_isr_service(0); //activa interrupciones
+
+    gpio_isr_handler_add(static_cast<gpio_num_t>(isr_pin_A), isr_A, this);
+    gpio_isr_handler_add(static_cast<gpio_num_t>(isr_pin_B), isr_B, this);
+
+}
+
+// ISR estática del pin A - Incrementa el contador de pulsos A
+void IRAM_ATTR Encoder::isr_A(void *arg) {
+    Encoder* encoder = static_cast<Encoder*>(arg);
+    encoder->totalPulsesA++;
+}
+
+// ISR estática del pin B - Incrementa el contador de pulsos B
+void IRAM_ATTR Encoder::isr_B(void *arg) {
+    Encoder* encoder = static_cast<Encoder*>(arg);
+    encoder->totalPulsesB++;
+}
+
+float Encoder::getRpm(){
+    totalPulsesA=0;  //pone en cero los pulsos del QUAD A
+    vTaskDelay(interval_MS/portTICK_PERIOD_MS); //Espera un intervalo de tiempo t y cuenta los pulsos en ese intervalo de tiempo t.
+    total=totalPulsesA; //guarda los pulsos del intervalo en el atributo total
+    getPulsesA();
+    totalPulsesA=0; //vuelve a poner en cero los pulsos del quad A
+    float RPM = (static_cast<float>(total) / ppr) * (60.0 / (interval_MS / 1000.0)); //ecuacion para pasar de pulsos a RPM
+    return RPM;
+}
+
+int Encoder::getPulsesA(){
+    int checkPulsesA=total; //guarda los pulsos de un intervalo de tiempo t en la variable checkPulsesA 
+    return checkPulsesA;
+}
+
+int Encoder::getPulsesB(){
+    unsigned long long checkPulsesB=totalPulsesB;  //toma los pulsos totales registrados del QUAD B y los guarda en la variable checkPulseB
+    return checkPulsesB; //regresa el valo de checkPulseB
+}
+
+int Encoder::getDirection(){
+    if(totalPulsesA<totalPulsesB){
+        return 1;
+    }
+    else if(totalPulsesB<totalPulsesA){
+        return 0;
+    }
+    else{
+        return -1;
+    }
+}
+void Encoder::resetPulsesB(){ //borra la cuenta de pulsos de B (ideal para medir distancia recorrida)
+    totalPulsesB=0;
+}
