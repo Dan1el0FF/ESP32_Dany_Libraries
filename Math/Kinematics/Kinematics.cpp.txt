@@ -1,0 +1,175 @@
+#include "Kinematics.h"
+
+Kinematics::Kinematics(){}
+
+void Kinematics::setup(float _dh_parameters[][4], int _joints){
+    dh=_dh_parameters;
+    joints=_joints;
+}
+
+void Kinematics::calculate_FK(float _pose[6]){
+
+    array<array<float, 4>, 4> Id_Mtrx = {{ // ESTABLECER MATRIZ IDENTIDAD
+        {1, 0, 0, 0},
+        {0, 1, 0, 0},
+        {0, 0, 1, 0},
+        {0, 0, 0, 1}
+    }};
+
+    for(int i=0;i<joints;i++){
+        array<array<float, 4>, 4> H_new = getHM(dh[i]);
+        Id_Mtrx = mult_matrix(Id_Mtrx,H_new);
+    }
+
+    array<float, 3> Euler_angles = getEulerAngles(Id_Mtrx); //de radianes a grados
+
+    _pose[0]=Id_Mtrx[0][3];   //X
+    _pose[1]=Id_Mtrx[1][3];   //Y
+    _pose[2]=Id_Mtrx[2][3];   //Z
+    _pose[3]=Euler_angles[0]; //Roll_Z             //en general podriamos ignorar pitch y yaw ya que siempre seran cero en el scara creo     
+    _pose[4]=Euler_angles[1]; //Pitch_Y 
+    _pose[5]=Euler_angles[2]; //Yaw_X
+}
+
+bool Kinematics::calculate_IK(float _coords[4],float solutions[2][4]){ //coords X,Y,Z,PHI solutions: aqui se van a guardar las 2 soluciones
+    float X,Y,Z,Phi,L1,L2,P,gamma;  //phi es la orientacion del gripper
+    X=_coords[0];
+    Y=_coords[1]; //aca debemos prestar atencion al orden en que se toman los datos.
+    Z=_coords[2];
+    Phi=degToRad(_coords[3]); //convertimos de grados a radianes para hacer las operaciones
+    L1=dh[1][3]; //aca en L1 y L2 tambien debemos prestar atencion al orden en que se toman los datos ya que va depender de los parametros de DH.
+    L2=dh[2][3]; 
+    P = sqrt(X*X + Y*Y);
+    gamma = atan2(Y,X);
+    if(P > L1+L2 || P< fabs(L1-L2)) {
+        printf("NO SE PUEDE ACCEDER A LAS SIGUIENTES COORDENDAS: %f, %f, %f \n",X,Y,Z);
+        return 0;
+    }
+    else {
+    float alpha = acos(((L2*L2)-(L1*L1)-(P*P))/(-2*L1*P));
+    float beta = acos(((P*P)-(L1*L1)-(L2*L2))/(-2*L1*L2));
+    //solucion 1
+    float theta1_A = gamma-alpha;
+    float theta2_A = M_PI-beta;
+    float theta3_A = Phi-(theta1_A + theta2_A);
+    solutions[0][0]= radToDeg(theta1_A);
+    solutions[0][1]= radToDeg(theta2_A);  //prestar atencion en el orden en el que se guarda la solucion del problema y convertimos a grados.
+    solutions[0][2]= radToDeg(theta3_A);
+    solutions[0][3]= Z;
+    //solucion 2
+    float theta1_B = gamma+alpha;
+    float theta2_B = beta-M_PI;
+    float theta3_B = Phi-(theta1_B + theta2_B);
+    solutions[1][0]= radToDeg(theta1_B); 
+    solutions[1][1]= radToDeg(theta2_B); //prestar atencion en el orden en el que se guarda la solucion del problema y convertimos a grados.
+    solutions[1][2]= radToDeg(theta3_B);
+    solutions[1][3]= Z;
+    return 1;
+    }
+}
+
+void Kinematics::calculate_Jacobian(float joint_vel[4],float operational_vel[6]){ // velocidades articulares y velocidades en el efector final.
+
+    float theta_1= degToRad(dh[1][0]); //tener cuidado con la posicion que se elige para las thetas ya que depende de los parametros DH
+    float theta_2= degToRad(dh[2][0]);
+    float L1=dh[1][3];
+    float L2=dh[2][3];
+    float c1= cos(theta_1);
+    float s1= sin(theta_1);
+    float c12= cos(theta_1 + theta_2);
+    float s12= sin(theta_1 + theta_2);
+    
+    float Jacobian[6][4]= {
+        //Linear Velocity
+        {0, -L1 * s1 - L2 * s12, -L2 * s12, 0},
+        {0, L1 * c1 + L2 * c12, L2 * c12, 0},
+        {1, 0, 0, 0},
+        //Angular Velocity
+        {0, 0, 0, 0},
+        {0, 0, 0, 0},
+        {0, 1, 1, 1}};
+    
+    for (int row=0; row < 6; row++)
+    {
+        operational_vel[row]= 0;
+        for (int col=0; col < 4; col++)
+            operational_vel[row] += Jacobian[row][col] * joint_vel[col];
+    }
+}
+
+void Kinematics::update_variables(float _joint_variables[4]){ //solo cambiar las posiciones que varian con el tiempo y cuidar la posicion.
+    dh[1][0]= _joint_variables[0]; //theta 1
+    dh[2][0]= _joint_variables[2]; //theta 2
+    dh[3][0]= _joint_variables[3]; //theta 3  //tener cuidado con la posicion que se elige para las thetas ya que depende de los parametros DH
+    dh[0][1]= _joint_variables[1]; //Z
+}
+int Kinematics::best_move(float solutions[2][4]){
+
+    float current_theta1 = dh[1][0];
+    float current_theta2 = dh[2][0]; //tener cuidado con la posicion que se elige para las thetas ya que depende de los parametros DH
+    float current_theta3 = dh[3][0];
+
+    float best_error = 1e6; // Inicializar con un error bien alto
+    int best_index = -1;    // Aquí vamos a guardar el índice de la mejor solución
+
+    for (int i = 0; i < 2; i++) // Recorremos ambas soluciones
+    { 
+        float theta1 = solutions[i][0];
+        float theta2 = solutions[i][1];
+        float theta3 = solutions[i][2];
+
+        // Calculamos un "error ponderado", dando más importancia a ciertos motores
+        float error =
+            2.0 * fabs(theta1 - current_theta1) +   // Motor 1 pesa más
+            1.5 * fabs(theta2 - current_theta2) +   // Motor 2 peso medio
+            1.0 * fabs(theta3 - current_theta3);    // Motor 3 pesa menos
+
+        // Si esta solución tiene menor error, la guardamos como la mejor
+        if (error < best_error)
+        {
+            best_error = error;
+            best_index = i;
+        }
+    }
+    return best_index;
+}
+
+array<array<float, 4>, 4> Kinematics::getHM(const float dh_parameters[4]) {
+
+    float t = dh_parameters[0]; //angulo theta
+    float d = dh_parameters[1]; 
+    float a = dh_parameters[2]; //angulo alpha
+    float r = dh_parameters[3];
+    t=degToRad(t);  //pasamos a radianes para hacer las operaciones
+    a=degToRad(a);
+    array<array<float, 4>,4> H={{
+        {cos(t), -cos(a)*sin(t),  sin(a)*sin(t), r*cos(t)},
+        {sin(t),  cos(a)*cos(t), -sin(a)*cos(t), r*sin(t)},
+        {0,       sin(a),         cos(a),        d},
+        {0,       0,              0,             1}
+    }};
+    return H;
+}
+array<array<float, 4>, 4> Kinematics::mult_matrix(const array<array<float, 4>, 4>& A, const array<array<float, 4>, 4>& B) {
+    array<array<float, 4>, 4> result = {};
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            for (int k = 0; k < 4; ++k) {
+                result[i][j] += A[i][k] * B[k][j];
+            }
+        }
+    }
+    return result;
+}
+array<float, 3> Kinematics::getEulerAngles(const std::array<std::array<float, 4>, 4>& H) {
+    float roll_z = atan2(H[2][1], H[2][2]) * 180.0 / M_PI;
+    float pitch_y = atan2(-H[2][0], sqrt(H[2][1] * H[2][1] + H[2][2] * H[2][2])) * 180.0 / M_PI;
+    float yaw_x = atan2(H[1][0], H[0][0]) * 180.0 / M_PI;
+    return {roll_z, pitch_y, yaw_x};
+}
+float Kinematics::degToRad(float deg){
+    return deg*M_PI/180.0;
+}
+float Kinematics::radToDeg(float rad){
+    return rad*180.0/M_PI;
+}
