@@ -1,0 +1,26 @@
+//PWM_PIN_ACTUALIZADA_VERSION_THRESHOLD_Y_BITS
+#ifndef PWMPIN_H
+#define PWMPIN_H
+#include "driver/ledc.h"
+
+class PwmPin {
+    private:
+        int channel; //canal del pwm del 0-7
+        int pin; //pin gpio de pwm
+        int power; //duty cycle
+        ledc_channel_config_t ledc_channel;
+        float frqz; 
+        int threshold; //threshold en relacion con la resolucion que se va usar.
+        int resolution;
+
+    public:
+        PwmPin(int channel, int pin,float frqz=5000,int resolution=8,int threshold=0);  // Canal pwm, gpio pwm, frecuencia, resolución en bits, threshold.
+        void configurePwm();
+        void setPower(int power);
+        int getPower();
+        void setFrqz(float newFrqz);
+        float getFrqz();
+
+};
+
+#endif

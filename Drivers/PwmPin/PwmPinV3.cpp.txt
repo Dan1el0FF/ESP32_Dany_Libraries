@@ -1,0 +1,72 @@
+//PWM_PIN_ACTUALIZADA_VERSION_THRESHOLD_Y_BITS
+#include "PwmPin.h"
+
+PwmPin::PwmPin(int channel_, int pin_, float frqz_,int resolution_,int threshold_){ //constructor inicializa parametros.
+    channel=channel_;
+    pin=pin_;
+    frqz=frqz_;
+    resolution=resolution_;
+    threshold=threshold_;
+    configurePwm();
+}
+void PwmPin::configurePwm(){
+    
+    ledc_timer_config_t ledc_timer = {
+        .speed_mode = LEDC_HIGH_SPEED_MODE,
+        .duty_resolution = ledc_timer_bit_t(resolution),//resolucion de 2^n
+        .timer_num = LEDC_TIMER_0,
+        .freq_hz = static_cast<uint32_t>(frqz),
+        .clk_cfg = LEDC_AUTO_CLK,
+        .deconfigure = false,
+    };
+    ledc_timer_config(&ledc_timer); 
+
+    ledc_channel = {
+        .gpio_num = pin,
+        .speed_mode = LEDC_HIGH_SPEED_MODE,
+        .channel = (ledc_channel_t)channel,
+        .intr_type = LEDC_INTR_DISABLE,
+        .timer_sel = LEDC_TIMER_0,
+        .duty = 0,
+        .hpoint = 0,
+        .flags = 0,
+    };
+    ledc_channel_config(&ledc_channel);
+
+}
+
+void PwmPin::setPower(int power_){  //setea la potencia en un rango de 2^n sin importar si se pasa o se pone menos de cero
+    power=power_;
+    int result = (1 << resolution)-1;
+    power = static_cast<int>(threshold + (power / static_cast<float>(result)) * (result - threshold));
+    if (power > result) power = result;
+    if (power < 0) power = 0;
+    ledc_set_duty(ledc_channel.speed_mode, ledc_channel.channel, power);
+    ledc_update_duty(ledc_channel.speed_mode, ledc_channel.channel);
+}
+
+int PwmPin::getPower(){
+    return power;
+}
+
+void PwmPin::setFrqz(float newFrqz){
+
+    frqz = newFrqz;
+
+    if(frqz<=10) frqz = 10;
+    if(frqz>=350) frqz = 350;
+
+    ledc_timer_config_t ledc_timer = {
+        .speed_mode = LEDC_HIGH_SPEED_MODE,
+        .duty_resolution = ledc_timer_bit_t(resolution),
+        .timer_num = LEDC_TIMER_0,
+        .freq_hz = static_cast<uint32_t>(frqz),
+        .clk_cfg = LEDC_AUTO_CLK,
+        .deconfigure = false,
+    };
+    ledc_timer_config(&ledc_timer);
+
+}
+float PwmPin::getFrqz(){
+    return frqz;
+}

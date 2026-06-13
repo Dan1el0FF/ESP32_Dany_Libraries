@@ -1,0 +1,39 @@
+//PWM_PIN_ACTUALIZADA_VERSION_FRQZ_CHANGING
+#include "PwmPin.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/gpio.h"
+#include "iostream"
+using namespace std;
+#define LED_R GPIO_NUM_15
+#define LED_G GPIO_NUM_2
+#define LED_B GPIO_NUM_0
+
+
+extern "C" void app_main(void) {
+    PwmPin R(0,LED_R); // parametros: (canal del Pwm, Pin donde se genera Pwm, frecuencia)
+    PwmPin G(1,LED_G,10000);
+    PwmPin B(2,LED_B,7500);
+    cout<<"La frecuencia de R es: "<<R.getFrqz()<<"La frecuencia de G es: "<<G.getFrqz()<<"La frecuencia de B es: "<<B.getFrqz()<<"\n";
+    while(true){
+    //Morado
+    R.setPower(200);
+    G.setPower(50);
+    B.setPower(200);
+    vTaskDelay(3000/portTICK_PERIOD_MS);
+    //Cyan
+    R.setFrqz(8000);
+    G.setFrqz(8000);
+    B.setFrqz(8000);
+    cout<<"La frecuencia de R es: "<<R.getFrqz()<<"La frecuencia de G es: "<<G.getFrqz()<<"La frecuencia de B es: "<<B.getFrqz()<<"\n";
+    R.setPower(0);
+    G.setPower(255);
+    B.setPower(255);
+    vTaskDelay(3000/portTICK_PERIOD_MS);
+    //Naranja
+    R.setPower(254);
+    G.setPower(100);
+    B.setPower(0);
+    vTaskDelay(3000/portTICK_PERIOD_MS);
+}
+}

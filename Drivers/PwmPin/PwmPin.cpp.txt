@@ -1,0 +1,70 @@
+//PWM_PIN_ACTUALIZADA_VERSION_FRQZ_CHANGING
+#include "PwmPin.h"
+
+PwmPin::PwmPin(int channel_, int pin_, float frqz_){ //constructor inicializa parametros.
+    channel=channel_;
+    pin=pin_;
+    frqz=frqz_;
+    configurePwm();
+}
+void PwmPin::configurePwm(){
+    
+    ledc_timer_config_t ledc_timer = {
+        .speed_mode = LEDC_HIGH_SPEED_MODE,
+        .duty_resolution = LEDC_TIMER_8_BIT, //resolucion de 0-255
+        .timer_num = LEDC_TIMER_0,
+        .freq_hz = static_cast<uint32_t>(frqz),
+        .clk_cfg = LEDC_AUTO_CLK,
+        .deconfigure = false,
+    };
+    ledc_timer_config(&ledc_timer); 
+
+    ledc_channel = {
+        .gpio_num = pin,
+        .speed_mode = LEDC_HIGH_SPEED_MODE,
+        .channel = (ledc_channel_t)channel,
+        .intr_type = LEDC_INTR_DISABLE,
+        .timer_sel = LEDC_TIMER_0,
+        .duty = 0,
+        .hpoint = 0,
+        .flags = 0,
+    };
+    ledc_channel_config(&ledc_channel);
+
+}
+
+void PwmPin::setPower(int power_){  //setea la potencia en un rango de 0-255 sin importar si se pasa o se pone menos de cero
+    power=power_;
+    if (power > 255) {
+        power = 255;
+    }
+    if (power < 0) {
+        power = 0;
+    }
+
+    ledc_set_duty(ledc_channel.speed_mode, ledc_channel.channel, power);
+    ledc_update_duty(ledc_channel.speed_mode, ledc_channel.channel);
+}
+
+int PwmPin::getPower(){
+    return power;
+}
+
+void PwmPin::setFrqz(float newFrqz){
+
+    frqz = newFrqz;
+
+    ledc_timer_config_t ledc_timer = {
+        .speed_mode = LEDC_HIGH_SPEED_MODE,
+        .duty_resolution = LEDC_TIMER_8_BIT, // Resolución de 0-255
+        .timer_num = LEDC_TIMER_0,
+        .freq_hz = static_cast<uint32_t>(frqz),
+        .clk_cfg = LEDC_AUTO_CLK,
+        .deconfigure = false,
+    };
+    ledc_timer_config(&ledc_timer);
+
+}
+float PwmPin::getFrqz(){
+    return frqz;
+}
