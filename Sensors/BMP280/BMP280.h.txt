@@ -1,0 +1,39 @@
+//Codigo probado, se puede mejorar
+#ifndef __BMP280_H__
+#define __BMP280_H__
+
+#include "MultipleI2C.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include "esp_log.h"
+#include <math.h>
+
+class BMP280 {
+private:
+    MultipleI2C* I2C_BMP280;
+
+    struct {
+        uint16_t dig_T1;
+        int16_t  dig_T2, dig_T3;
+        uint16_t dig_P1;
+        int16_t  dig_P2, dig_P3, dig_P4, dig_P5, dig_P6, dig_P7, dig_P8, dig_P9;
+    } calib;
+
+    int32_t t_fine;
+
+    void read_calibration_data();
+    int32_t compensate_T(int32_t adc_T);
+    uint32_t compensate_P(int32_t adc_P);
+    void calibrate_altitude();
+
+    float initial_pressure = 0;
+    bool AUTO_CALIBRATE;
+
+public:
+    BMP280(MultipleI2C* i2c_ptr);
+    void init_BMP280(uint8_t i2c_addr = 0x77,bool _AUTO_CALIBRATE = true); // 0x76,0x77
+    void read_BMP280(float sensor_data[3]); //absoluta temperature,pressure,altitude
+    void read_BMP280_fast(float sensor_data[3]); //relativa
+};
+
+#endif

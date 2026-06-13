@@ -1,0 +1,31 @@
+#include <stdio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_log.h"
+#include "MultipleI2C.h"
+#include "BMP280.h"
+
+extern "C" void app_main(void)
+{
+    // Crear la instancia del bus I2C
+    static MultipleI2C bus;
+    
+    // Crear la instancia del sensor pasando el puntero del bus
+    static BMP280 bmp(&bus);
+
+    // Inicializar el sensor (por defecto usa 0x76)
+    // Esto configura internamente los pines SDA 21 y SCL 22 a 400kHz
+    bmp.init_BMP280();
+
+    float sensor_data[3], sensor_data1[3];
+    while (true) {
+        // Leer datos: la función actualiza las variables por referencia
+        bmp.read_BMP280(sensor_data);
+        bmp.read_BMP280_fast(sensor_data1);
+        // Imprimir resultados en consola
+        printf(">C:%f,Pa:%f,meters:%f,meters1:%f\r\n", 
+                sensor_data[0], sensor_data[1], sensor_data[2]-2134,sensor_data1[2]);
+
+        vTaskDelay(10/portTICK_PERIOD_MS);
+    }
+}
